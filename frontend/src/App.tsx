@@ -111,6 +111,8 @@ type Job = {
 
   progress?: number;
 
+  current_filename?: string;
+
   total_files?: number;
 
   total_cases?: number;
