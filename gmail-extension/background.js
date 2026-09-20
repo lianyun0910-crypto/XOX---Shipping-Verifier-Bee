@@ -1,6 +1,8 @@
 const API_URL =
   "https://xox-shipping-verifier-bee-api.onrender.com";
 
+const POLL_INTERVAL_MS = 1000;
+
 
 // ============================================================
 // SIDE PANEL
@@ -303,7 +305,7 @@ async function analyzeEmailBatch(
 
 
   // ----------------------------------------------------------
-  // Save state
+  // Save initial state
   // ----------------------------------------------------------
 
   await chrome.storage.session.set({
@@ -357,19 +359,19 @@ async function analyzeEmailBatch(
 
 
   // ----------------------------------------------------------
-  // BACKEND BATCH REQUEST
+  // CREATE ASYNC BACKEND JOB
   // ----------------------------------------------------------
 
   try {
 
     console.log(
-      "[Shipping Verifier] Calling Gmail batch endpoint..."
+      "[Shipping Verifier] Creating Gmail analysis job..."
     );
 
 
     const response =
       await fetch(
-        `${API_URL}/api/gmail/classify-batch`,
+        `${API_URL}/api/gmail/analyze-batch`,
         {
 
           method:
@@ -416,7 +418,7 @@ async function analyzeEmailBatch(
 
 
     console.log(
-      "[Shipping Verifier] Gmail batch response:",
+      "[Shipping Verifier] Gmail analysis job created:",
       data
     );
 
@@ -434,206 +436,55 @@ async function analyzeEmailBatch(
     }
 
 
-    // --------------------------------------------------------
-    // Normalize results
-    // --------------------------------------------------------
+    if (
+      !data.job_id
+    ) {
 
-    const rawResults =
-      Array.isArray(
-        data.results
-      )
-        ? data.results
-        : [];
-
-
-    const results =
-      rawResults.map(
-        (
-          result,
-          index
-        ) => {
-
-          const email =
-            emails[index] ||
-            {};
-
-
-          return {
-
-            ...result,
-
-            email_id:
-              result.email_id ||
-              email.email_id ||
-              `gmail-${index}`,
-
-            subject:
-              result.subject ||
-              email.subject ||
-              "Gmail email",
-
-            from:
-              result.from ||
-              email.from ||
-              "",
-
-            category:
-              result.category ||
-              result.email_category ||
-              "UNKNOWN",
-
-            email_category:
-              result.email_category ||
-              result.category ||
-              "UNKNOWN",
-
-            status:
-              result.status ||
-              "NEEDS_REVIEW",
-
-            gmail_url:
-              result.gmail_url ||
-              email.gmail_url ||
-              ""
-
-          };
-
-        }
+      throw new Error(
+        "Backend did not return a Gmail analysis job ID."
       );
 
-
-    // --------------------------------------------------------
-    // Calculate summary
-    // --------------------------------------------------------
-
-    const ok =
-      results.filter(
-        (item) =>
-          item.status ===
-          "OK"
-      ).length;
-
-
-    const mismatch =
-      results.filter(
-        (item) =>
-          item.status ===
-          "MISMATCH"
-      ).length;
-
-
-    const needsReview =
-      results.filter(
-        (item) =>
-          item.status ===
-          "NEEDS_REVIEW"
-      ).length;
-
-
-    const analysis = {
-
-      status:
-        "COMPLETED",
-
-      run_id:
-        data.run_id ||
-        "",
-
-      total:
-        results.length,
-
-      processed:
-        results.length,
-
-      ok:
-        data.summary?.ok ??
-        ok,
-
-      mismatch:
-        data.summary?.mismatch ??
-        mismatch,
-
-      needs_review:
-        data.summary?.needs_review ??
-        needsReview,
-
-      summary:
-        data.summary ||
-        {
-          total:
-            results.length,
-
-          ok:
-            ok,
-
-          mismatch:
-            mismatch,
-
-          needs_review:
-            needsReview
-        },
-
-      results:
-        results,
-
-      history:
-        data.history ||
-        null,
-
-      cloud_archive:
-        data.cloud_archive ||
-        null
-
-    };
+    }
 
 
     // --------------------------------------------------------
-    // Save final extension state
+    // Save job state
     // --------------------------------------------------------
 
     await chrome.storage.session.set({
 
-      latestAnalysis:
-        analysis
+      latestAnalysis: {
 
-    });
+        status:
+          data.status ||
+          "QUEUED",
 
+        job_id:
+          data.job_id,
 
-    // --------------------------------------------------------
-    // Notify side panel
-    // --------------------------------------------------------
+        total:
+          data.total ||
+          emails.length,
 
-    notifyExtensionPages({
+        processed:
+          0,
 
-      type:
-        "GMAIL_ANALYSIS_COMPLETED",
-
-      data:
-        analysis
-
-    });
-
-
-    // --------------------------------------------------------
-    // Notify Gmail Bee
-    // --------------------------------------------------------
-
-    sendToGmailTab(
-      tabId,
-      {
-        type:
-          "GMAIL_ANALYSIS_COMPLETED",
-
-        data:
-          analysis
+        results:
+          []
 
       }
-    );
+
+    });
 
 
-    console.log(
-      "[Shipping Verifier] Gmail analysis completed:",
-      analysis
+    // --------------------------------------------------------
+    // START POLLING
+    // --------------------------------------------------------
+
+    await pollGmailJob(
+      data.job_id,
+      emails,
+      tabId
     );
 
 
@@ -647,41 +498,594 @@ async function analyzeEmailBatch(
     );
 
 
-    const errorMessage =
+    await finishAnalysisError(
       getErrorMessage(
+        error
+      ),
+      emails,
+      tabId
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// POLL GMAIL ANALYSIS JOB
+// ============================================================
+
+async function pollGmailJob(
+  jobId,
+  emails,
+  tabId
+) {
+
+  console.log(
+    "[Shipping Verifier] Polling Gmail job:",
+    jobId
+  );
+
+
+  while (
+    true
+  ) {
+
+    try {
+
+      const response =
+        await fetch(
+          `${API_URL}/api/gmail/status/${encodeURIComponent(jobId)}`,
+          {
+            method:
+              "GET",
+
+            cache:
+              "no-store"
+          }
+        );
+
+
+      const text =
+        await response.text();
+
+
+      let data = {};
+
+
+      try {
+
+        data =
+          text
+            ? JSON.parse(
+                text
+              )
+            : {};
+
+      } catch {
+
+        throw new Error(
+          "Backend returned invalid JSON while checking Gmail job."
+        );
+
+      }
+
+
+      console.log(
+        "[Shipping Verifier] Gmail job status:",
+        data
+      );
+
+
+      if (
+        !response.ok
+      ) {
+
+        throw new Error(
+          data.detail ||
+          data.message ||
+          `Backend returned HTTP ${response.status}.`
+        );
+
+      }
+
+
+      const status =
+        String(
+          data.status ||
+          ""
+        ).toUpperCase();
+
+
+      const processed =
+        Number(
+          data.processed ||
+          0
+        );
+
+
+      const total =
+        Number(
+          data.total ||
+          emails.length ||
+          0
+        );
+
+
+      const currentResults =
+        Array.isArray(
+          data.results
+        )
+          ? data.results
+          : [];
+
+
+      // ------------------------------------------------------
+      // SAVE CURRENT PROGRESS
+      // ------------------------------------------------------
+
+      await chrome.storage.session.set({
+
+        latestAnalysis: {
+
+          ...data,
+
+          status:
+
+            status ||
+            "PROCESSING",
+
+          job_id:
+            jobId,
+
+          total:
+            total,
+
+          processed:
+            processed,
+
+          results:
+            currentResults
+
+        }
+
+      });
+
+
+      // ------------------------------------------------------
+      // SEND PROGRESS TO SIDE PANEL
+      // ------------------------------------------------------
+
+      notifyExtensionPages({
+
+        type:
+          "GMAIL_ANALYSIS_PROGRESS",
+
+        data: {
+
+          ...data,
+
+          status:
+            status ||
+            "PROCESSING",
+
+          job_id:
+            jobId,
+
+          total:
+            total,
+
+          processed:
+            processed,
+
+          results:
+            currentResults
+
+        }
+
+      });
+
+
+      // ------------------------------------------------------
+      // SEND PROGRESS TO GMAIL BEE
+      // ------------------------------------------------------
+
+      sendToGmailTab(
+        tabId,
+        {
+
+          type:
+            "GMAIL_ANALYSIS_PROGRESS",
+
+          data: {
+
+            ...data,
+
+            status:
+              status ||
+              "PROCESSING",
+
+            job_id:
+              jobId,
+
+            total:
+              total,
+
+            processed:
+              processed,
+
+            results:
+              currentResults
+
+          }
+
+        }
+      );
+
+
+      // ------------------------------------------------------
+      // COMPLETED
+      // ------------------------------------------------------
+
+      if (
+        status ===
+          "COMPLETED" ||
+
+        status ===
+          "SUCCESS" ||
+
+        status ===
+          "DONE"
+      ) {
+
+        console.log(
+          "[Shipping Verifier] Gmail job completed."
+        );
+
+
+        const analysis =
+          normalizeCompletedAnalysis(
+            data,
+            emails
+          );
+
+
+        await chrome.storage.session.set({
+
+          latestAnalysis:
+            analysis
+
+        });
+
+
+        // ----------------------------------------------------
+        // SIDE PANEL
+        // ----------------------------------------------------
+
+        notifyExtensionPages({
+
+          type:
+            "GMAIL_ANALYSIS_COMPLETED",
+
+          data:
+            analysis
+
+        });
+
+
+        // ----------------------------------------------------
+        // GMAIL BEE
+        // ----------------------------------------------------
+
+        sendToGmailTab(
+          tabId,
+          {
+
+            type:
+              "GMAIL_ANALYSIS_COMPLETED",
+
+            data:
+              analysis
+
+          }
+        );
+
+
+        console.log(
+          "[Shipping Verifier] Final Gmail analysis:",
+          analysis
+        );
+
+
+        return;
+      }
+
+
+      // ------------------------------------------------------
+      // ERROR
+      // ------------------------------------------------------
+
+      if (
+        status ===
+          "ERROR" ||
+
+        status ===
+          "FAILED"
+      ) {
+
+        throw new Error(
+          data.error ||
+          data.message ||
+          "Gmail analysis job failed."
+        );
+
+      }
+
+
+      // ------------------------------------------------------
+      // STILL PROCESSING
+      // ------------------------------------------------------
+
+      await sleep(
+        POLL_INTERVAL_MS
+      );
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "[Shipping Verifier] Gmail polling failed:",
         error
       );
 
 
-    const analysis = {
+      throw error;
 
-      status:
-        "ERROR",
+    }
 
-      total:
-        emails.length,
+  }
 
-      processed:
-        0,
-
-      results:
-        [],
-
-      error:
-        errorMessage
-
-    };
+}
 
 
-    await chrome.storage.session.set({
+// ============================================================
+// NORMALIZE COMPLETED RESULT
+// ============================================================
 
-      latestAnalysis:
-        analysis
+function normalizeCompletedAnalysis(
+  data,
+  emails
+) {
 
-    });
+  const rawResults =
+    Array.isArray(
+      data.results
+    )
+      ? data.results
+      : [];
 
 
-    notifyExtensionPages({
+  const results =
+    rawResults.map(
+      (
+        result,
+        index
+      ) => {
+
+        const email =
+          emails[index] ||
+          {};
+
+
+        return {
+
+          ...result,
+
+          email_id:
+            result.email_id ||
+            email.email_id ||
+            `gmail-${index}`,
+
+          subject:
+            result.subject ||
+            email.subject ||
+            "Gmail email",
+
+          from:
+            result.from ||
+            email.from ||
+            "",
+
+          category:
+            result.category ||
+            result.email_category ||
+            "UNKNOWN",
+
+          email_category:
+            result.email_category ||
+            result.category ||
+            "UNKNOWN",
+
+          status:
+            result.status ||
+            "NEEDS_REVIEW",
+
+          gmail_url:
+            result.gmail_url ||
+            email.gmail_url ||
+            ""
+
+        };
+
+      }
+    );
+
+
+  // ----------------------------------------------------------
+  // SUMMARY
+  // ----------------------------------------------------------
+
+  const ok =
+    results.filter(
+      (item) =>
+        item.status ===
+        "OK"
+    ).length;
+
+
+  const mismatch =
+    results.filter(
+      (item) =>
+        item.status ===
+        "MISMATCH"
+    ).length;
+
+
+  const needsReview =
+    results.filter(
+      (item) =>
+        item.status ===
+        "NEEDS_REVIEW"
+    ).length;
+
+
+  return {
+
+    ...data,
+
+    status:
+      "COMPLETED",
+
+    job_id:
+      data.job_id ||
+      "",
+
+    run_id:
+      data.run_id ||
+      "",
+
+    total:
+      Number(
+        data.total
+      ) ||
+      results.length,
+
+    processed:
+      Number(
+        data.processed
+      ) ||
+      results.length,
+
+    ok:
+      data.summary?.ok ??
+      data.ok ??
+      ok,
+
+    mismatch:
+      data.summary?.mismatch ??
+      data.mismatch ??
+      mismatch,
+
+    needs_review:
+      data.summary?.needs_review ??
+      data.needs_review ??
+      needsReview,
+
+    summary:
+      data.summary ||
+      {
+
+        total:
+          results.length,
+
+        ok:
+          ok,
+
+        mismatch:
+          mismatch,
+
+        needs_review:
+          needsReview
+
+      },
+
+    results:
+      results,
+
+    history:
+      data.history ||
+      null,
+
+    cloud_archive:
+      data.cloud_archive ||
+      null
+
+  };
+
+}
+
+
+// ============================================================
+// ERROR HANDLING
+// ============================================================
+
+async function finishAnalysisError(
+  errorMessage,
+  emails,
+  tabId
+) {
+
+  const analysis = {
+
+    status:
+      "ERROR",
+
+    total:
+      emails.length,
+
+    processed:
+      0,
+
+    results:
+      [],
+
+    error:
+      errorMessage
+
+  };
+
+
+  await chrome.storage.session.set({
+
+    latestAnalysis:
+      analysis
+
+  });
+
+
+  // ----------------------------------------------------------
+  // SIDE PANEL
+  // ----------------------------------------------------------
+
+  notifyExtensionPages({
+
+    type:
+      "GMAIL_ANALYSIS_ERROR",
+
+    data:
+      analysis
+
+  });
+
+
+  // ----------------------------------------------------------
+  // GMAIL BEE
+  // ----------------------------------------------------------
+
+  sendToGmailTab(
+    tabId,
+    {
 
       type:
         "GMAIL_ANALYSIS_ERROR",
@@ -689,22 +1093,8 @@ async function analyzeEmailBatch(
       data:
         analysis
 
-    });
-
-
-    sendToGmailTab(
-      tabId,
-      {
-        type:
-          "GMAIL_ANALYSIS_ERROR",
-
-        data:
-          analysis
-
-      }
-    );
-
-  }
+    }
+  );
 
 }
 
@@ -778,7 +1168,29 @@ function notifyExtensionPages(
 
 
 // ============================================================
-// ERROR
+// SLEEP
+// ============================================================
+
+function sleep(
+  milliseconds
+) {
+
+  return new Promise(
+    (resolve) => {
+
+      setTimeout(
+        resolve,
+        milliseconds
+      );
+
+    }
+  );
+
+}
+
+
+// ============================================================
+// ERROR MESSAGE
 // ============================================================
 
 function getErrorMessage(
