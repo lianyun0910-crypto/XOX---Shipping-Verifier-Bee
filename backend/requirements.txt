@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+openai
+pypdf
+python-docx
+openpyxl
+python-pptx
+extract-msg
+pandas
+Pillow
+pytesseract
+supabase
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib

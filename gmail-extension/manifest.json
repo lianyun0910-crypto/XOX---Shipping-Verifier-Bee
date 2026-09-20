@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Shipping Verifier Bee",
+  "version": "0.3.0",
+  "description": "AI-powered shipping email verification assistant with Gmail integration.",
+  "minimum_chrome_version": "114",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+  "https://mail.google.com/*",
+  "https://xox-shipping-verifier-bee-api.onrender.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Shipping Verifier Bee"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["bee.svg"],
+      "matches": ["https://mail.google.com/*"]
+    }
+  ]
+}

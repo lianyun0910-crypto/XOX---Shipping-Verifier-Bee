@@ -1,0 +1,62 @@
+# =========================
+# Secrets / Environment
+# =========================
+.env
+*.env
+backend/.env
+
+google_credentials.json
+backend/google_credentials.json
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+backend/venv/
+venv/
+.venv/
+
+# =========================
+# Node
+# =========================
+node_modules/
+frontend/node_modules/
+
+dist/
+build/
+frontend/dist/
+
+# =========================
+# Local uploaded files
+# =========================
+data/uploads/
+data/gmail_attachments/
+
+# =========================
+# Local records / runtime data
+# =========================
+data/records/gmail/
+data/records/gmail_oauth_states.json
+data/records/gmail_oauth_token.json
+data/records/review_queue.json
+data/records/verification_history.jsonl
+data/records/*.xlsx
+
+# =========================
+# Logs / temporary files
+# =========================
+*.log
+*.tmp
+*.temp
+
+# =========================
+# OS / IDE
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

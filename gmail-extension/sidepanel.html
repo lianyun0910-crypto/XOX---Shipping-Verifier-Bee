@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shipping Verifier Bee</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <img src="bee.svg" alt="Bee" class="bee">
+        <div>
+          <div class="brand-title">Shipping Verifier</div>
+          <div class="brand-subtitle">Gmail AI Assistant</div>
+        </div>
+      </div>
+      <div class="connection" id="connectionStatus">Checking Gmail...</div>
+    </header>
+
+    <main class="main">
+      <section class="hero">
+        <div class="status-dot"></div>
+        <div>
+          <h1>Hi! I'm Bee.</h1>
+          <p>Drag one or more Gmail emails to Bee. With OAuth connected, Bee can fetch the real email and attachments.</p>
+        </div>
+      </section>
+
+      <button id="connectGmail" class="secondary-button">Connect Gmail</button>
+      <button id="analyzeCurrent" class="primary-button">Analyze Current Email</button>
+      <button id="openWebApp" class="secondary-button">Open Shipping Verifier</button>
+
+      <section class="drop-card">
+        <img src="bee.svg" alt="Bee" class="drop-bee">
+        <div class="drop-title">Drag emails to Bee</div>
+        <div class="drop-description">Select several Gmail rows first to analyze them together.</div>
+      </section>
+
+      <section id="progressSection" class="progress-section hidden">
+        <div class="section-label">GMAIL VERIFICATION</div>
+        <div class="progress-label"><span id="progressText">0 / 0</span><strong id="progressPercent">0%</strong></div>
+        <div class="progress-bar"><div id="progressFill"></div></div>
+      </section>
+
+      <section id="resultSection" class="result-section hidden">
+        <div class="section-label">LATEST RESULTS</div>
+        <div id="summaryCards" class="summary-cards"></div>
+        <div id="resultsList" class="results-list"></div>
+        <button id="openReview" class="secondary-button">Open Review Queue</button>
+        <button id="openHistory" class="secondary-button">Open Verification History</button>
+      </section>
+
+      <section id="loadingSection" class="loading-section hidden">
+        <img src="bee.svg" alt="Analyzing" class="loading-bee">
+        <div><strong>Analyzing...</strong><span>Bee is fetching Gmail data and checking the shipment.</span></div>
+      </section>
+      <section id="errorSection" class="error-section hidden"></section>
+    </main>
+
+    <footer class="footer"><span>Shipping Verifier Bee</span><span>OAuth + AI + Review</span></footer>
+  </div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
