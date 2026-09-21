@@ -1,6 +1,9 @@
 const API_URL =
   "https://xox-shipping-verifier-bee-api.onrender.com";
 
+const FRONTEND_URL =
+  "https://xox-shipping-verifier-lncl8ga7n-xox8.vercel.app";
+
 const POLL_INTERVAL_MS = 1000;
 
 
@@ -149,7 +152,7 @@ chrome.runtime.onMessage.addListener(
 
       chrome.tabs.create({
         url:
-          "http://localhost:5173"
+          FRONTEND_URL
       });
 
 

@@ -1379,7 +1379,7 @@ function showBubble(
       );
 
     },
-    10000
+    20000
   );
 }
 

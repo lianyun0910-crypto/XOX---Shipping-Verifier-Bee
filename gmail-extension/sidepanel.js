@@ -1,4 +1,6 @@
 const API_URL = "https://xox-shipping-verifier-bee-api.onrender.com";
+const FRONTEND_URL =
+  "https://xox-shipping-verifier-lncl8ga7n-xox8.vercel.app";
 
 const analyzeCurrent = document.getElementById("analyzeCurrent");
 const connectGmail = document.getElementById("connectGmail");
@@ -39,11 +41,15 @@ openWebApp.addEventListener("click", () => {
 });
 
 openHistory.addEventListener("click", () => {
-  chrome.tabs.create({ url: "http://localhost:5173/#history" });
+  chrome.tabs.create({
+    url: `${FRONTEND_URL}/#history`
+  });
 });
 
 openReview.addEventListener("click", () => {
-  chrome.tabs.create({ url: "http://localhost:5173/#review" });
+  chrome.tabs.create({
+    url: `${FRONTEND_URL}/#review`
+  });
 });
 
 async function loadAccount() {
