@@ -1,60 +1,265 @@
-# Shipping Verifier — Gmail + Web Prototype
+# Shipping Verifier Bee
 
-This is a clean integrated prototype for the Shipping Document Verification hackathon workflow.
+AI-powered shipping email and document verification for Gmail and Web.
 
-## What is included
+## Live Demo
 
-- Existing Web verification flow and compact UI preserved.
-- Existing Agnes AI model/configuration preserved.
-- Gmail OAuth + Gmail API integration.
-- Gmail Bee can detect an email and trigger analysis from Gmail.
-- Gmail uses the real Gmail message and downloads the real attachments.
-- SI / BL attachments are passed into the same existing `analyze_email()` pipeline used by Web uploads.
-- Existing AI document classification, extraction, normalization, and semantic comparison are reused.
-- Verification results return to the Gmail Bee with status, confidence, reasons, next action, evidence, documents, and field-by-field SI / BL comparison.
-- History page keeps the existing design and opens each run in a modal with expandable per-case details.
-- Review Queue remains available.
-- Excel report generation remains available.
-- Supabase/cloud archive remains available.
-- Duplicate detection has been removed from backend, frontend, Gmail extension, and Excel output.
+**Web App**  
+https://xox-shipping-verifier-lncl8ga7n-xox8.vercel.app/
 
-## Gmail flow
+**Backend API**  
+https://xox-shipping-verifier-bee-api.onrender.com/
+
+**GitHub**  
+https://github.com/lianyun0910-crypto/XOX---Shipping-Verifier-Bee
+
+---
+
+## What It Does
+
+Shipping Verifier Bee helps automate shipping-document verification directly from email or the web.
+
+It can:
+
+- Classify shipping emails
+- Extract shipping information from documents
+- Compare Shipping Instructions (SI) with Bills of Lading (BL)
+- Detect field-level mismatches
+- Escalate uncertain cases for human review
+- Run verification through the Gmail Bee Chrome extension
+- Keep historical verification results
+- Generate Excel reports
+- Store application data and document archives through Supabase
+
+### Email Categories
+
+`BL_COMPARISON` · `SI_REQUEST` · `INVOICE_QUERY` · `GENERAL` · `SPAM`
+
+### Verification Results
+
+`OK` · `MISMATCH` · `NEEDS_REVIEW`
+
+### Verified Fields
+
+- Shipper
+- Consignee
+- Notify Party
+- Port of Loading
+- Port of Discharge
+- Container Count
+- Gross Weight
+
+---
+
+## Architecture
 
 ```text
-Gmail email
-  -> Chrome Bee
-  -> FastAPI /api/gmail/classify-batch
-  -> Gmail API message/thread lookup
-  -> real attachment download
-  -> existing analyze_email()
-  -> existing extractor + normalizer + comparator
-  -> OK / MISMATCH / NEEDS_REVIEW
-  -> detailed result returned to Bee
+Gmail
+   ↓
+Gmail Bee Chrome Extension
+   ↓
+Render FastAPI Backend
+   ↓
+Agnes AI
+   ↓
+Classification
+   ↓
+Document Extraction
+   ↓
+Normalization
+   ↓
+SI / BL Comparison
+   ↓
+OK / MISMATCH / NEEDS_REVIEW
+   ↓
+Vercel Web App / Gmail Bee
 ```
 
-## Environment
+### Technology Stack
 
-Create this file locally:
+| Component | Technology |
+|---|---|
+| Frontend | Vercel |
+| Backend | FastAPI on Render |
+| AI | Agnes AI (`agnes-2.5-flash`) |
+| Database / Storage | Supabase |
+| Email Integration | Gmail API |
+| Authentication | Google OAuth |
+| Browser Integration | Chrome Extension |
+
+---
+
+## Verification Pipeline
+
+For `BL_COMPARISON` emails:
 
 ```text
-backend/.env
+Email
+  ↓
+Classify email
+  ↓
+Find SI + BL documents
+  ↓
+Extract 7 shipping fields
+  ↓
+Normalize values
+  ↓
+Compare SI vs BL
+  ↓
+Return verification result
 ```
 
-Copy your real values from your current project. The ZIP intentionally does NOT include real secrets, API keys, OAuth secrets, refresh tokens, or service credentials.
+### Result Types
 
-Use `backend/.env.example` as the template.
+**OK**  
+The required information is sufficiently consistent.
 
-Expected keys include:
+**MISMATCH**  
+One or more verified fields differ between the SI and BL.
+
+**NEEDS_REVIEW**  
+The system cannot safely complete the verification and requires human review.
+
+---
+
+## Gmail Bee
+
+The Gmail Bee Chrome extension allows users to start verification directly from Gmail.
+
+### Gmail Flow
+
+```text
+Gmail Email
+   ↓
+Bee detects selected email
+   ↓
+Gmail API message lookup
+   ↓
+Download shipping attachments
+   ↓
+Render FastAPI backend
+   ↓
+Existing analyzer pipeline
+   ↓
+AI extraction + comparison
+   ↓
+Result returned to Bee
+```
+
+The same core verification pipeline is reused for Gmail and Web uploads.
+
+The Bee can display:
+
+- Verification status
+- Confidence
+- Email category
+- Explanation / reason
+- Next action
+- SI filename
+- BL filename
+- Field-by-field comparison
+- Evidence
+- Review reason
+
+---
+
+## Gmail Authorization
+
+Before using Gmail Bee, the Google account must be authorized for the project's Google OAuth application.
+
+Open the Google authorization endpoint:
+
+https://xox-shipping-verifier-bee-api.onrender.com/api/gmail/oauth/start
+
+Complete Google OAuth using the authorized testing account.
+
+The application uses Gmail API access to retrieve the selected email and its attachments for verification.
+
+---
+
+## Chrome Extension Setup
+
+1. Open Chrome.
+2. Go to:
+
+```text
+chrome://extensions/
+```
+
+3. Enable **Developer mode**.
+4. Select **Load unpacked**.
+5. Select the `gmail-extension/` folder from this repository.
+6. Reload the extension.
+7. Open Gmail and use the Shipping Verifier Bee.
+
+The production extension communicates with the deployed Render backend and Vercel web application.
+
+---
+
+## Web App
+
+Open the deployed Vercel application:
+
+https://xox-shipping-verifier-lncl8ga7n-xox8.vercel.app/
+
+The Web App provides:
+
+- Shipping email/document verification
+- Verification results
+- SI / BL comparison
+- Review Queue
+- Historical verification dashboard
+- Excel report generation
+
+---
+
+## History
+
+The History section stores previous verification runs.
+
+Users can inspect individual historical cases and review:
+
+- Verification status
+- AI explanation
+- Documents
+- Extracted information
+- SI / BL comparison
+- Review information
+
+---
+
+## Supabase
+
+Supabase is used for application data and shipping-document storage.
+
+Required environment variables:
+
+```env
+SUPABASE_URL=YOUR_SUPABASE_URL
+SUPABASE_SECRET_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_BUCKET=shipping-verifier
+CLOUD_LINK_EXPIRES_SECONDS=86400
+CLOUD_ARCHIVE_FILES=true
+```
+
+Never expose or commit the Supabase service-role key.
+
+---
+
+## Environment Variables
+
+The production backend uses environment variables for AI, Supabase, and Google OAuth configuration.
 
 ```env
 AI_API_KEY=YOUR_AGNES_API_KEY
 AI_BASE_URL=https://apihub.agnes-ai.com/v1
 AI_MODEL=agnes-2.5-flash
+
 AI_MAX_RETRIES=2
 AI_RETRY_DELAY=5
 AI_MIN_REQUEST_INTERVAL=2
 
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_URL=YOUR_SUPABASE_URL
 SUPABASE_SECRET_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
 SUPABASE_BUCKET=shipping-verifier
 CLOUD_LINK_EXPIRES_SECONDS=86400
@@ -63,116 +268,147 @@ CLOUD_ARCHIVE_FILES=true
 GOOGLE_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
 GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
 GMAIL_REDIRECT_URI=https://xox-shipping-verifier-bee-api.onrender.com/api/gmail/oauth/callback
-FRONTEND_URL=https://xox-shipping-verifier-bee-mu.vercel.app/
+
+FRONTEND_URL=https://xox-shipping-verifier-lncl8ga7n-xox8.vercel.app/
 ```
 
-Do not commit `backend/.env` or Gmail token files.
+Never commit:
 
-## Start everything
+- `.env`
+- API keys
+- Google OAuth secrets
+- Gmail tokens
+- Supabase service-role keys
 
-The easiest option on Windows is:
+---
+
+## Project Structure
 
 ```text
-START_ALL.cmd
+XOX---Shipping-Verifier-Bee/
+├── backend/
+├── frontend/
+├── gmail-extension/
+├── data/
+└── README.md
 ```
 
-It opens the backend and frontend in separate command windows. On the first run it automatically creates the Python virtual environment, installs Python dependencies, installs frontend npm dependencies, and starts the servers.
-
-### Manual backend
-
-```powershell
-cd C:\Users\USER\Documents\shipping-verifier-final-prototype
-.\START_BACKEND.cmd
-```
-
-Backend:
+### Main Backend Modules
 
 ```text
-http://127.0.0.1:8000
+classifier.py       → Email classification
+extractor.py        → Shipping field extraction
+normalizer.py       → Data normalization
+comparator.py       → SI / BL comparison
+document_reader.py  → Document processing
+email_reader.py     → Email processing
+analyzer.py         → Verification pipeline
+main.py             → FastAPI API
 ```
 
-### Manual frontend
+---
 
-```powershell
-cd C:\Users\USER\Documents\shipping-verifier-final-prototype
-.\START_FRONTEND.cmd
-```
+## Production Deployment
 
-Frontend:
+The public prototype uses:
 
 ```text
-http://localhost:5173
+Vercel
+   ↓
+Frontend
+
+Render
+   ↓
+FastAPI Backend
+
+Supabase
+   ↓
+Application Data / Document Storage
+
+Agnes AI
+   ↓
+AI Classification / Extraction / Verification
+
+Gmail API + Google OAuth
+   ↓
+Gmail Bee Integration
 ```
 
-## Gmail authorization
+The production demo uses the deployed Vercel and Render services. No local server is required for the public demo.
 
-After the backend is running, authorize Gmail once in the browser:
+---
+
+## Quick Demo
+
+### Web Demo
+
+1. Open the Vercel Web App.
+2. Upload or analyze a shipping email/document.
+3. Review the extracted shipping information.
+4. Review the SI / BL comparison.
+5. Check the final verification result.
+6. Open History to inspect previous verification runs.
+
+### Gmail Demo
+
+1. Use an authorized Google testing account.
+2. Complete Google OAuth.
+3. Install the Gmail Bee Chrome extension.
+4. Open Gmail.
+5. Open a shipping email.
+6. Activate Shipping Verifier Bee.
+7. Review the verification result directly from the Gmail workflow.
+
+---
+
+## Security Notes
+
+Do not commit or expose:
+
+- API keys
+- Google OAuth client secrets
+- Gmail refresh tokens
+- Supabase service-role keys
+- Other private credentials
+
+Use environment variables for production secrets.
+
+---
+
+## Hackathon Demo
+
+Shipping Verifier Bee demonstrates an end-to-end workflow:
 
 ```text
-http://127.0.0.1:8000/api/gmail/oauth/start
+Email
+  ↓
+AI Classification
+  ↓
+Document Extraction
+  ↓
+Field Normalization
+  ↓
+SI / BL Verification
+  ↓
+Human Review when necessary
+  ↓
+Historical Record / Report
 ```
 
-The OAuth token is stored locally under `data/records/` and is intentionally not included in the ZIP. After authorization, the backend can reuse the saved token across restarts while it remains refreshable.
+The system is designed to reduce manual checking of shipping documents while keeping uncertain cases available for human review.
 
-## Chrome extension
+---
 
-Open:
+## Links
 
-```text
-chrome://extensions/
-```
+**Web App**  
+https://xox-shipping-verifier-lncl8ga7n-xox8.vercel.app/
 
-Turn on **Developer mode** -> **Load unpacked** -> select:
+**Backend API**  
+https://xox-shipping-verifier-bee-api.onrender.com/
 
-```text
-C:\Users\USER\Documents\shipping-verifier-final-prototype\gmail-extension
-```
+**Google Gmail Authorization**  
+https://xox-shipping-verifier-bee-api.onrender.com/api/gmail/oauth/start
 
-Then reload the extension and refresh Gmail.
-
-## What should happen in Gmail
-
-When an email with shipping documents is analyzed:
-
-```text
-Gmail
-  -> Bee detects selected email
-  -> real Gmail API message lookup
-  -> SI / BL attachments downloaded
-  -> existing AI analyzer runs
-  -> AI semantic comparison runs
-  -> Bee displays the result
-```
-
-The Bee result can include:
-
-- Verification status
-- Confidence
-- Category
-- Explanation / reason
-- Next action
-- SI filename
-- BL filename
-- Field-by-field comparison for 7 fields
-- Evidence
-- Review reason when manual review is required
-
-## 7 comparison fields
-
-- shipper
-- consignee
-- notify_party
-- port_of_loading
-- port_of_discharge
-- container_count
-- gross_weight_kg
-
-The comparison keeps the existing semantic behavior, including company-name normalization, port aliases, numeric container counts, and kg/metric-ton conversion. Missing or unreadable values are escalated to `NEEDS_REVIEW` rather than being treated as mismatches.
-
-## History
-
-Open **History** in the Web app. Each historical run opens in a detail modal. Each email/case inside the run is expandable, so you can inspect the AI explanation, documents, and SI / BL comparison without leaving the History page.
-
-## Notes
-
-This ZIP is a local prototype package. A real Gmail run still requires one-time Google OAuth authorization in your own browser because refresh tokens are user-specific and cannot be bundled safely.
+**GitHub Repository**  
+https://github.com/lianyun0910-crypto/XOX---Shipping-Verifier-Bee
